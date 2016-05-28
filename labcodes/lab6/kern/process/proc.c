@@ -87,7 +87,7 @@ static struct proc_struct *
 alloc_proc(void) {
     struct proc_struct *proc = kmalloc(sizeof(struct proc_struct));
     if (proc != NULL) {
-    //LAB4:EXERCISE1 2012011387
+    //LAB4:EXERCISE1 2012011391
     /*
      * below fields in proc_struct need to be initialized
      *       enum proc_state state;                      // Process state
@@ -102,6 +102,22 @@ alloc_proc(void) {
      *       uintptr_t cr3;                              // CR3 register: the base addr of Page Directroy Table(PDT)
      *       uint32_t flags;                             // Process flag
      *       char name[PROC_NAME_LEN + 1];               // Process name
+     */
+     //LAB5 2012011391 : (update LAB4 steps)
+    /*
+     * below fields(add in LAB5) in proc_struct need to be initialized	
+     *       uint32_t wait_state;                        // waiting state
+     *       struct proc_struct *cptr, *yptr, *optr;     // relations between processes
+	 */
+     //LAB6 2012011391 : (update LAB5 steps)
+    /*
+     * below fields(add in LAB6) in proc_struct need to be initialized
+     *     struct run_queue *rq;                       // running queue contains Process
+     *     list_entry_t run_link;                      // the entry linked in run queue
+     *     int time_slice;                             // time slice for occupying the CPU
+     *     skew_heap_entry_t lab6_run_pool;            // FOR LAB6 ONLY: the entry in the run pool
+     *     uint32_t lab6_stride;                       // FOR LAB6 ONLY: the current stride of the process
+     *     uint32_t lab6_priority;                     // FOR LAB6 ONLY: the priority of process, set by lab6_set_priority(uint32_t)
      */
         proc->state = PROC_UNINIT;
         proc->pid = -1;
@@ -118,7 +134,7 @@ alloc_proc(void) {
         proc->wait_state = 0;
         proc->cptr = proc->optr = proc->yptr = NULL;
         proc->rq = NULL;
-        list_init(&(proc->run_link));
+        proc->run_link.prev = proc->run_link.next = NULL;
         proc->time_slice = 0;
         proc->lab6_run_pool.left = proc->lab6_run_pool.right = proc->lab6_run_pool.parent = NULL;
         proc->lab6_stride = 0;
@@ -384,7 +400,7 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
         goto fork_out;
     }
     ret = -E_NO_MEM;
-    //LAB4:EXERCISE2 2012011387
+    //LAB4:EXERCISE2 2012011391
     /*
      * Some Useful MACROs, Functions and DEFINEs, you can use them in below implementation.
      * MACROs or Functions:
@@ -396,7 +412,7 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
      *                 setup the kernel entry point and stack of process
      *   hash_proc:    add proc into proc hash_list
      *   get_pid:      alloc a unique pid for process
-     *   wakeup_proc:  set proc->state = PROC_RUNNABLE
+     *   wakup_proc:   set proc->state = PROC_RUNNABLE
      * VARIABLES:
      *   proc_list:    the process set's list
      *   nr_process:   the number of process set
@@ -407,8 +423,17 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
     //    3. call copy_mm to dup OR share mm according clone_flag
     //    4. call copy_thread to setup tf & context in proc_struct
     //    5. insert proc_struct into hash_list && proc_list
-    //    6. call wakeup_proc to make the new child process RUNNABLE
+    //    6. call wakup_proc to make the new child process RUNNABLE
     //    7. set ret vaule using child proc's pid
+
+	//LAB5 2012011391 : (update LAB4 steps)
+   /* Some Functions
+    *    set_links:  set the relation links of process.  ALSO SEE: remove_links:  lean the relation links of process 
+    *    -------------------
+	*    update step 1: set child proc's parent to current process, make sure current process's wait_state is 0
+	*    update step 5: insert proc_struct into hash_list && proc_list, set the relation links of process
+    */
+
     if ((proc = alloc_proc()) == NULL) {
         goto fork_out;
     }
@@ -626,7 +651,7 @@ load_icode(unsigned char *binary, size_t size) {
     //(6) setup trapframe for user environment
     struct trapframe *tf = current->tf;
     memset(tf, 0, sizeof(struct trapframe));
-    /* LAB5:EXERCISE1 2012011387
+    /* LAB5:EXERCISE1 2012011391
      * should set tf_cs,tf_ds,tf_es,tf_ss,tf_esp,tf_eip,tf_eflags
      * NOTICE: If we set trapframe correctly, then the user level process can return to USER MODE from kernel. So
      *          tf_cs should be USER_CS segment (see memlayout.h)
@@ -653,7 +678,7 @@ bad_mm:
     goto out;
 }
 
-// do_execve - call exit_mmap(mm)&put_pgdir(mm) to reclaim memory space of current process
+// do_execve - call exit_mmap(mm)&pug_pgdir(mm) to reclaim memory space of current process
 //           - call load_icode to setup new memory space accroding binary prog.
 int
 do_execve(const char *name, size_t len, unsigned char *binary, size_t size) {
@@ -840,8 +865,7 @@ init_main(void *arg) {
     assert(nr_process == 2);
     assert(list_next(&proc_list) == &(initproc->list_link));
     assert(list_prev(&proc_list) == &(initproc->list_link));
-    assert(nr_free_pages_store == nr_free_pages());
-    assert(kernel_allocated_store == kallocated());
+
     cprintf("init check memory pass.\n");
     return 0;
 }
